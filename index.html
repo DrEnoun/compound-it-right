@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compounding Technique Monitor</title>
+<link rel="stylesheet" href="monitor.css">
+</head>
+<body>
+<header>
+  <h1>Compounding Technique Monitor</h1>
+  <span class="tag">Teaching aid &middot; flags are prompts for the instructor, not a final grade</span>
+</header>
+<main>
+  <section class="stage">
+    <div class="video-wrap">
+      <video id="video" playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div id="alert" class="alert" hidden></div>
+      <div id="placeholder" class="placeholder">Camera is off</div>
+    </div>
+    <div class="controls">
+      <button id="btn-camera">Turn on camera</button>
+      <button id="btn-prev" disabled>&larr; Back</button>
+      <button id="btn-next" disabled class="primary">Next step &rarr;</button>
+      <button id="btn-start" disabled class="primary">Start session</button>
+      <button id="btn-export" disabled>Export report</button>
+    </div>
+    <p class="hint">Drag on the video to redraw the aseptic work zone. Student name:
+      <input id="student" placeholder="optional" maxlength="40"></p>
+  </section>
+  <aside>
+    <h2 id="protocol-name">Protocol</h2>
+    <ol id="steps"></ol>
+    <p id="instruction" class="instruction"></p>
+    <h2>Event log <span id="score"></span></h2>
+    <ul id="log"></ul>
+  </aside>
+</main>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+{
+  "_note": "EXAMPLE protocol only. Thresholds are starting points for the instructor to tune against the lab's own SOP before assessing students.",
+  "name": "Aseptic syringe transfer (example)",
+  "zone": { "x": 0.15, "y": 0.2, "w": 0.7, "h": 0.7 },
+  "steps": [
+    {
+      "id": "setup", "title": "Set up in the work zone",
+      "instruction": "Place vial and syringe inside the marked zone. Keep both hands visible.",
+      "rules": [
+        { "type": "hands", "min": 1, "severity": "info", "message": "Show your hands to the camera" },
+        { "type": "zone", "severity": "error", "message": "Hands must stay inside the aseptic work zone" }
+      ]
+    },
+    {
+      "id": "hold-vial", "title": "Stabilise the vial",
+      "instruction": "One hand steadies the vial, the other holds the syringe.",
+      "minSeconds": 3,
+      "rules": [
+        { "type": "hands", "min": 2, "severity": "warn", "graceMs": 1200, "message": "Use both hands: one on the vial, one on the syringe" },
+        { "type": "zone", "severity": "error", "message": "Hand left the aseptic work zone" },
+        { "type": "steady", "maxJitter": 0.35, "windowMs": 800, "severity": "warn", "message": "Hand is shaking. Rest your wrist and steady the vial" }
+      ]
+    },
+    {
+      "id": "draw", "title": "Draw up the volume",
+      "instruction": "Draw slowly and smoothly. Keep the syringe steady and upright.",
+      "minSeconds": 5,
+      "rules": [
+        { "type": "zone", "severity": "error", "message": "Hand left the aseptic work zone" },
+        { "type": "speed", "maxSpeed": 2.5, "severity": "warn", "message": "Moving too fast. Draw slowly" },
+        { "type": "posture", "angle": 0, "tolerance": 50, "graceMs": 1000, "severity": "warn", "message": "Hold the syringe closer to upright" },
+        { "type": "visible", "severity": "error", "graceMs": 1500, "message": "Hands out of camera view. Step cannot be assessed" }
+      ]
+    },
+    {
+      "id": "expel-air", "title": "Expel air bubbles",
+      "instruction": "Hold the syringe tip-up and steady.",
+      "minSeconds": 3,
+      "rules": [
+        { "type": "posture", "angle": 0, "tolerance": 35, "graceMs": 800, "severity": "error", "message": "Syringe tip must point up while removing air" },
+        { "type": "steady", "maxJitter": 0.3, "windowMs": 800, "severity": "warn", "message": "Hold steady" },
+        { "type": "zone", "severity": "error", "message": "Hand left the aseptic work zone" }
+      ]
+    },
+    {
+      "id": "dispense", "title": "Dispense into the container",
+      "instruction": "Move calmly and keep everything inside the zone.",
+      "rules": [
+        { "type": "zone", "severity": "error", "message": "Hand left the aseptic work zone" },
+        { "type": "speed", "maxSpeed": 3, "severity": "warn", "message": "Moving too fast" }
+      ]
+    }
+  ]
+}

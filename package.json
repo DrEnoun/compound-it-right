@@ -1,0 +1,8 @@
+{
+  "name": "compound-it-right",
+  "version": "0.1.0",
+  "description": "Webcam hand-tracking monitor that flags compounding technique errors in pharmacy lab",
+  "scripts": { "test": "node tools/test-compounding.mjs", "serve": "python3 -m http.server 8080" },
+  "private": true,
+  "type": "module"
+}
