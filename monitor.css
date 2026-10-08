@@ -30,3 +30,4 @@ aside { background:var(--card); border-radius:10px; padding:4px 16px 16px; align
 #log li.warn { border-color:var(--warn); } #log li.error { border-color:var(--err); } #log li.info { border-color:var(--acc); }
 #log small { color:var(--mute); display:block; }
 #score { color:var(--ink); text-transform:none; letter-spacing:0; margin-left:6px; }
+select { width:100%; background:var(--card); color:var(--ink); border:1px solid #2c3d50; border-radius:8px; padding:8px; font:inherit; }

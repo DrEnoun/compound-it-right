@@ -30,6 +30,8 @@ export class RuleEngine {
     this.state = new Map();   // rule key -> { since, fired }
     this.history = new Map(); // hand label -> [{t, x, y, palm}]
     this.lastSeen = 0;
+    this.activeMs = 0;       // time spent in a required motion (circular) this step
+    this.lastT = null;
   }
 
   /**
@@ -45,7 +47,7 @@ export class RuleEngine {
     for (const m of metrics) {
       const h = this.history.get(m.label) ?? [];
       h.push({ t, x: m.center.x, y: m.center.y, palm: m.palm });
-      while (h.length && t - h[0].t > 1500) h.shift();
+      while (h.length && t - h[0].t > 4000) h.shift();
       this.history.set(m.label, h);
     }
     for (const label of [...this.history.keys()]) {
@@ -66,6 +68,9 @@ export class RuleEngine {
       } else { s.since = null; s.fired = false; }
       this.state.set(key, s);
     });
+    const dt = this.lastT == null ? 0 : Math.min(t - this.lastT, 200);
+    this.lastT = t;
+    if (rules.some(r => r.type === 'circular') && metrics.some(m => circling(this.history.get(m.label), t, rules.find(r => r.type === 'circular'), m.palm))) this.activeMs += dt;
     return { active, fired };
   }
 
@@ -87,8 +92,9 @@ export class RuleEngine {
       }
       case 'steady': {
         for (const m of metrics) {
-          const h = this.history.get(m.label) ?? [];
-          if (h.length < 6 || h[h.length - 1].t - h[0].t < (rule.windowMs ?? 700)) continue;
+          const win = rule.windowMs ?? 700;
+          const h = (this.history.get(m.label) ?? []).filter(p => t - p.t <= win);
+          if (h.length < 6 || h[h.length - 1].t - h[0].t < win * 0.85) continue;
           const mx = h.reduce((a, p) => a + p.x, 0) / h.length;
           const my = h.reduce((a, p) => a + p.y, 0) / h.length;
           const jitter = h.reduce((a, p) => a + Math.hypot(p.x - mx, p.y - my), 0) / h.length / m.palm;
@@ -115,12 +121,76 @@ export class RuleEngine {
         }
         return null;
       }
+      case 'shake': {
+        for (const m of metrics) {
+          const hz = oscillationHz(this.history.get(m.label), t, rule);
+          if (hz > rule.maxHz) return `${m.label} hand shaking at about ${hz.toFixed(1)} Hz`;
+        }
+        return null;
+      }
+      case 'circular': {
+        // Not enough tracking history yet: don't judge until the window has filled.
+        const win = rule.windowMs ?? 2500;
+        const ready = metrics.some(m => { const h = this.history.get(m.label) ?? []; return h.length && t - h[0].t >= win * 0.8; });
+        if (!ready) return metrics.length ? null : 'no steady circular motion detected';
+        const ok = metrics.some(m => circling(this.history.get(m.label), t, rule, m.palm));
+        return ok ? null : 'no steady circular motion detected';
+      }
       case 'visible': {
         return metrics.length === 0 && t - this.lastSeen > (rule.graceMs ?? 400) ? 'hands out of camera view' : null;
       }
       default: return null;
     }
   }
+}
+
+/**
+ * Circular motion over the last `windowMs`: the hand sweeps at least `minTurns`
+ * around the centre of its own path, at a radius between minRadius and maxRadius (palm-widths).
+ */
+export function circling(h, t, rule, palm) {
+  const win = rule.windowMs ?? 2500;
+  const pts = (h ?? []).filter(p => t - p.t <= win);
+  if (pts.length < 8 || pts[pts.length - 1].t - pts[0].t < win * 0.8) return false;
+  const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+  const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+  const meanR = pts.reduce((a, p) => a + Math.hypot(p.x - cx, p.y - cy), 0) / pts.length / palm;
+  if (meanR < (rule.minRadius ?? 0.15) || meanR > (rule.maxRadius ?? 2)) return false;
+  let sweep = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a0 = Math.atan2(pts[i - 1].y - cy, pts[i - 1].x - cx) * 180 / Math.PI;
+    const a1 = Math.atan2(pts[i].y - cy, pts[i].x - cx) * 180 / Math.PI;
+    sweep += angleDiff(a1, a0);
+  }
+  return Math.abs(sweep) / 360 >= (rule.minTurns ?? 1);
+}
+
+/** Back-and-forth shaking frequency (Hz) on the busiest axis, ignoring wobbles smaller than minAmp palm-widths. */
+export function oscillationHz(h, t, rule) {
+  const win = rule.windowMs ?? 1000;
+  const pts = (h ?? []).filter(p => t - p.t <= win);
+  if (pts.length < 6 || pts[pts.length - 1].t - pts[0].t < win * 0.8) return 0;
+  const palm = pts[pts.length - 1].palm, minAmp = (rule.minAmp ?? 0.3) * palm;
+  let best = 0;
+  for (const axis of ['x', 'y']) {
+    let dir = 0, hi = pts[0][axis], lo = hi, reversals = 0;
+    for (const p of pts) {
+      const v = p[axis];
+      if (v > hi) hi = v;
+      if (v < lo) lo = v;
+      if (dir !== 1 && v - lo > minAmp) { if (dir === -1) reversals++; dir = 1; hi = v; }
+      else if (dir !== -1 && hi - v > minAmp) { if (dir === 1) reversals++; dir = -1; lo = v; }
+    }
+    best = Math.max(best, reversals);
+  }
+  return best / 2 / ((pts[pts.length - 1].t - pts[0].t) / 1000);
+}
+
+/** Required-motion check when a step is finished (e.g. swirl or grind for at least N seconds). */
+export function checkActive(step, activeMs) {
+  if (step.minActiveSeconds == null) return null;
+  const s = activeMs / 1000;
+  return s < step.minActiveSeconds ? `Only ${s.toFixed(0)}s of correct motion, need ${step.minActiveSeconds}s` : null;
 }
 
 /** Duration checks happen when a step is finished. Returns a message or null. */

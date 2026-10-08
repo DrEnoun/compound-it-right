@@ -1,7 +1,8 @@
 // Unit test for the Compounding Monitor rule engine with synthetic hands. Run: node tools/test-compounding.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { RuleEngine, handMetrics, angleDiff, checkDuration } from '../js/rules.js';
+import { readdirSync } from 'node:fs';
+import { RuleEngine, handMetrics, angleDiff, checkDuration, checkActive } from '../js/rules.js';
 
 // Hand with wrist at (cx,cy) and middle knuckle `palm` away at `deg` (0 = up).
 function hand(cx, cy, deg = 0, palm = 0.12, label = 'Right') {
@@ -73,11 +74,53 @@ assert.match(checkDuration({ minSeconds: 5 }, 2000), /too quickly/);
 assert.match(checkDuration({ maxSeconds: 5 }, 9000), /too long/);
 assert.equal(checkDuration({ minSeconds: 5 }, 6000), null);
 
-// shipped protocol is well-formed
-const p = JSON.parse(readFileSync(new URL('../data/protocol.json', import.meta.url)));
-const types = new Set(['zone', 'hands', 'steady', 'speed', 'posture', 'visible']);
-for (const s of p.steps) for (const rule of s.rules) {
-  assert.ok(types.has(rule.type), `${s.id}: unknown rule ${rule.type}`);
-  assert.ok(['info', 'warn', 'error'].includes(rule.severity) && rule.message);
+// shake vs gentle swirl vs idle
+const SHAKE = { type: 'shake', maxHz: 2.5, minAmp: 0.3, graceMs: 100 };
+const circle = (hz, rad) => t => [hand(0.5 + rad * Math.cos(2 * Math.PI * hz * t / 1000), 0.6 + rad * Math.sin(2 * Math.PI * hz * t / 1000))];
+r = run([SHAKE], ticks(0, 3000, t => [hand(0.5, 0.6 + 0.04 * Math.sin(2 * Math.PI * 5 * t / 1000))])); // ~5 Hz, 0.33 palm amp
+assert.equal(r.fired.length, 1, 'shaking at 5 Hz is flagged');
+r = run([SHAKE], ticks(0, 3000, circle(1, 0.05)));
+assert.equal(r.fired.length, 0, 'gentle swirl at 1 Hz is not shaking');
+r = run([SHAKE], ticks(0, 3000, t => [hand(0.5, 0.6 + 0.004 * Math.sin(2 * Math.PI * 6 * t / 1000))]));
+assert.equal(r.fired.length, 0, 'tiny tremor below minAmp is ignored');
+
+const CIRC = { type: 'circular', windowMs: 2500, minTurns: 1, minRadius: 0.15, maxRadius: 2, graceMs: 500 };
+r = run([CIRC], ticks(0, 5000, circle(1, 0.06)));
+assert.equal(r.fired.length, 0, 'circling hand satisfies circular rule');
+r = run([CIRC], ticks(0, 5000, circle(1, 0.06)).concat(ticks(5050, 9000, () => [hand(0.5, 0.6)])));
+assert.equal(r.fired.length, 1, 'stopping is flagged');
+r = run([CIRC], ticks(0, 5000, t => [hand(0.3 + 0.4 * (t / 5000), 0.6)]));
+assert.equal(r.fired.length, 1, 'straight-line motion is not circling');
+r = run([CIRC], ticks(0, 5000, circle(1, 0.005)));
+assert.equal(r.fired.length, 1, 'tiny jitter is not circling');
+
+// active time accumulates only while circling
+{
+  const e = new RuleEngine();
+  ticks(0, 6000, circle(1, 0.06)).forEach(([t, hs]) => e.update(t, hs, [CIRC], zone));
+  assert.ok(e.activeMs > 2500 && e.activeMs < 6000, 'activeMs ' + e.activeMs);
+  e.reset(); assert.equal(e.activeMs, 0);
+}
+assert.match(checkActive({ minActiveSeconds: 10 }, 4000), /Only 4s/);
+assert.equal(checkActive({ minActiveSeconds: 10 }, 11000), null);
+assert.equal(checkActive({}, 0), null);
+
+// every shipped protocol is well-formed and listed
+const dir = new URL('../data/protocols/', import.meta.url);
+const index = JSON.parse(readFileSync(new URL('index.json', dir)));
+const files = readdirSync(dir).filter(f => f !== 'index.json').sort();
+assert.deepEqual(index.map(i => i.file).sort(), files, 'index.json lists every protocol');
+const types = new Set(['zone', 'hands', 'steady', 'speed', 'posture', 'visible', 'shake', 'circular']);
+for (const { file } of index) {
+  const p = JSON.parse(readFileSync(new URL(file, dir)));
+  assert.ok(p.name && p.zone && p.steps.length, file);
+  for (const st of p.steps) {
+    assert.ok(st.id && st.title && st.instruction, `${file}/${st.id}`);
+    for (const rule of st.rules) {
+      assert.ok(types.has(rule.type), `${file}/${st.id}: unknown rule ${rule.type}`);
+      assert.ok(['info', 'warn', 'error'].includes(rule.severity) && rule.message, `${file}/${st.id}`);
+    }
+    if (st.minActiveSeconds) assert.ok(st.rules.some(x => x.type === 'circular'), `${file}/${st.id}: minActiveSeconds needs a circular rule`);
+  }
 }
 console.log('compounding monitor: all tests passed');

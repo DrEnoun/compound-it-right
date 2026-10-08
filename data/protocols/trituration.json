@@ -1,0 +1,45 @@
+{
+  "_note": "EXAMPLE protocol only. Thresholds are starting points: tune against your lab SOP before assessing students. Times are illustrative.",
+  "name": "Trituration with mortar and pestle",
+  "zone": { "x": 0.1, "y": 0.15, "w": 0.8, "h": 0.8 },
+  "steps": [
+    {
+      "id": "setup", "title": "Set up",
+      "instruction": "Place the mortar in the zone and hold the pestle. Keep your hand visible.",
+      "rules": [
+        { "type": "hands", "min": 1, "severity": "info", "message": "Show your hands to the camera" },
+        { "type": "zone", "severity": "error", "message": "Keep your hands inside the work zone" }
+      ]
+    },
+    {
+      "id": "grind", "title": "Grind the drug alone",
+      "instruction": "Triturate in steady, even circles until the powder is fine.",
+      "minSeconds": 20, "minActiveSeconds": 15,
+      "rules": [
+        { "type": "circular", "windowMs": 3000, "minTurns": 1.5, "minRadius": 0.15, "maxRadius": 2, "graceMs": 3000, "severity": "warn", "message": "Keep grinding in steady circles" },
+        { "type": "speed", "maxSpeed": 5, "severity": "warn", "message": "Too fast. Use steady, even pressure" },
+        { "type": "zone", "severity": "error", "message": "Keep your hands inside the work zone" }
+      ]
+    },
+    {
+      "id": "add-diluent", "title": "Add diluent (geometric dilution)",
+      "instruction": "Add the diluent in portions, slowly and calmly.",
+      "minSeconds": 4,
+      "rules": [
+        { "type": "speed", "maxSpeed": 3, "severity": "warn", "message": "Too fast. Add the diluent calmly" },
+        { "type": "steady", "maxJitter": 0.4, "windowMs": 800, "severity": "warn", "message": "Hand is unsteady" },
+        { "type": "zone", "severity": "error", "message": "Keep your hands inside the work zone" }
+      ]
+    },
+    {
+      "id": "mix", "title": "Triturate to mix",
+      "instruction": "Mix thoroughly in steady circles.",
+      "minSeconds": 30, "minActiveSeconds": 25,
+      "rules": [
+        { "type": "circular", "windowMs": 3000, "minTurns": 1.5, "minRadius": 0.15, "maxRadius": 2, "graceMs": 3000, "severity": "warn", "message": "Keep mixing in steady circles" },
+        { "type": "speed", "maxSpeed": 5, "severity": "warn", "message": "Too fast. Use steady, even pressure" },
+        { "type": "zone", "severity": "error", "message": "Keep your hands inside the work zone" }
+      ]
+    }
+  ]
+}

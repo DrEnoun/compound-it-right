@@ -1,5 +1,5 @@
 // Compounding Technique Monitor: webcam + MediaPipe Hands (reuses ../vendor) + rule engine.
-import { RuleEngine, checkDuration } from './rules.js';
+import { RuleEngine, checkDuration, checkActive } from './rules.js';
 
 const VENDOR = 'vendor/mediapipe-hands/';
 const $ = id => document.getElementById(id);
@@ -11,8 +11,14 @@ const engine = new RuleEngine();
 let protocol, zone, hands = [], stepIdx = 0, session = null, stepStart = 0, hl = null;
 let alertUntil = 0;
 
-async function loadProtocol() {
-  protocol = await (await fetch('data/protocol.json')).json();
+async function loadProtocol(file) {
+  if (!file) {
+    const list = await (await fetch('data/protocols/index.json')).json();
+    $('protocol-select').innerHTML = list.map(p => `<option value="${p.file}">${p.title}</option>`).join('');
+    file = list[0].file;
+  }
+  protocol = await (await fetch('data/protocols/' + file)).json();
+  stepIdx = 0; session = null; $('btn-start').disabled = !video.srcObject; $('btn-export').disabled = true;
   try { zone = JSON.parse(localStorage.getItem('cm-zone')); } catch { /* ignore */ }
   zone ??= protocol.zone;
   $('protocol-name').textContent = protocol.name;
@@ -66,8 +72,9 @@ function nextStep(delta) {
   if (delta > 0) {
     const step = protocol.steps[stepIdx];
     const now = performance.now();
-    const msg = checkDuration(step, now - stepStart);
-    if (msg) { logEvent('warn', msg); showAlert('warn', msg); }
+    for (const msg of [checkDuration(step, now - stepStart), checkActive(step, engine.activeMs)]) {
+      if (msg) { logEvent('warn', msg); showAlert('warn', msg); }
+    }
     session.stepTimes.push({ step: step.id, ms: now - stepStart });
     if (stepIdx === protocol.steps.length - 1) {
       session.endedMs = now - session.t0; stepIdx = protocol.steps.length;
@@ -176,9 +183,13 @@ canvas.addEventListener('pointerdown', e => {
   canvas.addEventListener('pointermove', move); canvas.addEventListener('pointerup', up);
 });
 
+$('protocol-select').onchange = async e => {
+  if (session && !confirm('Leave this session? Unexported results will be lost.')) { e.target.value = e.target.dataset.cur; return; }
+  e.target.dataset.cur = e.target.value; await loadProtocol(e.target.value); draw([]);
+};
 $('btn-camera').onclick = startCamera;
 $('btn-start').onclick = startSession;
 $('btn-next').onclick = () => nextStep(1);
 $('btn-prev').onclick = () => nextStep(-1);
 $('btn-export').onclick = exportReport;
-loadProtocol().then(() => draw([]));
+loadProtocol().then(() => { $('protocol-select').dataset.cur = $('protocol-select').value; draw([]); });

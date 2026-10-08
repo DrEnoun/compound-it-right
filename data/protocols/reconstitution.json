@@ -1,0 +1,45 @@
+{
+  "_note": "EXAMPLE protocol only. Thresholds are starting points: tune against your lab SOP and the product's own reconstitution instructions before assessing students.",
+  "name": "Reconstituting a vial (swirl, don't shake)",
+  "zone": { "x": 0.15, "y": 0.2, "w": 0.7, "h": 0.7 },
+  "steps": [
+    {
+      "id": "setup", "title": "Set up in the work zone",
+      "instruction": "Place the vial and diluent inside the marked zone. Keep your hands visible.",
+      "rules": [
+        { "type": "hands", "min": 1, "severity": "info", "message": "Show your hands to the camera" },
+        { "type": "zone", "severity": "error", "message": "Hands must stay inside the work zone" }
+      ]
+    },
+    {
+      "id": "add-diluent", "title": "Add the diluent",
+      "instruction": "Add the diluent slowly and steadily. Do not shake the vial.",
+      "minSeconds": 4,
+      "rules": [
+        { "type": "zone", "severity": "error", "message": "Hand left the work zone" },
+        { "type": "speed", "maxSpeed": 2.5, "severity": "warn", "message": "Moving too fast. Add the diluent slowly" },
+        { "type": "shake", "maxHz": 2.5, "minAmp": 0.3, "severity": "error", "message": "Do not shake the vial" }
+      ]
+    },
+    {
+      "id": "swirl", "title": "Swirl gently",
+      "instruction": "Swirl the vial in gentle circles until dissolved. Never shake.",
+      "minSeconds": 15, "minActiveSeconds": 12,
+      "rules": [
+        { "type": "shake", "maxHz": 2.5, "minAmp": 0.3, "severity": "error", "message": "Shaking detected. Swirl gently instead" },
+        { "type": "speed", "maxSpeed": 4, "severity": "warn", "message": "Swirling too hard. Slow down" },
+        { "type": "circular", "windowMs": 2500, "minTurns": 1, "minRadius": 0.15, "maxRadius": 1.5, "graceMs": 3000, "severity": "warn", "message": "Keep swirling in steady circles" },
+        { "type": "zone", "severity": "error", "message": "Hand left the work zone" }
+      ]
+    },
+    {
+      "id": "rest", "title": "Set down and let it settle",
+      "instruction": "Put the vial down. Do not shake or tap it.",
+      "minSeconds": 5,
+      "rules": [
+        { "type": "shake", "maxHz": 2.5, "minAmp": 0.3, "severity": "error", "message": "Do not shake or tap the vial" },
+        { "type": "zone", "severity": "error", "message": "Hand left the work zone" }
+      ]
+    }
+  ]
+}

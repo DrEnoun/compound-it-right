@@ -1,0 +1,5 @@
+[
+  { "file": "syringe-transfer.json", "title": "Aseptic syringe transfer" },
+  { "file": "reconstitution.json", "title": "Reconstituting a vial (swirl, don't shake)" },
+  { "file": "trituration.json", "title": "Trituration with mortar and pestle" }
+]
